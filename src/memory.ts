@@ -9,7 +9,6 @@ import type {
   PruneResult,
   SessionSummary,
   IdentityConfig,
-  BuildPromptOptions,
 } from './types';
 import { resolveConfig } from './config';
 import { MEMORY_TOOLS } from './tools/tool-definitions';
@@ -121,10 +120,10 @@ export class MemorySystem {
   // ── System prompt ─────────────────────────────────────────────────
 
   /** Build full system prompt for a user */
-  buildSystemPrompt(userId: string | number, options: BuildPromptOptions = {}): string {
+  buildSystemPrompt(userId: string | number): string {
     const identity = this.getUserIdentity(userId);
     const sessionSummaries = this.getRecentSessionSummaries(userId);
     const userInsights = this.getUserInsightsContext(userId);
-    return buildIdentityPrompt(identity, sessionSummaries, userInsights, options);
+    return buildIdentityPrompt(identity, sessionSummaries, userInsights);
   }
 }

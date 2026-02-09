@@ -1,8 +1,24 @@
 # monok-memory
 
-Persistent per-user memory system for AI chatbots. File-based storage with tagging, insights, learnings, context management, and session summaries. Zero runtime dependencies.
+Persistent, per-user memory system for AI chatbots. Give your AI assistant the ability to remember users across conversations — their preferences, past discussions, ongoing tasks, and learned interaction patterns. All stored as flat files with zero runtime dependencies.
 
 Extracted from [monok.ai](https://monok.ai) — production-tested with real users.
+
+## Features
+
+- **Persistent file-based memory** — Read, write, and organize per-user memory files (notes, profiles, topic files)
+- **Tagging & search** — Tag conversations by topic and importance, then retrieve them later
+- **User insights** — Automatically track user preferences, communication style, work patterns, interests, and goals
+- **Self-improvement learnings** — Record what works well in interactions and adapt over time
+- **Pending item tracking** — Track unresolved items and follow up in future conversations
+- **Session summaries** — Summarize conversations with automatic deduplication and consolidation
+- **Context pruning** — Intelligently prune long conversations using importance scoring to stay within token limits
+- **Identity system** — Per-user customizable bot identity (name, personality, voice)
+- **System prompt builder** — Generate rich system prompts with identity, session history, and user insights baked in
+- **Conversation history** — Save dated conversation logs organized by year/month/week
+- **Claude tool_use integration** — 13 ready-to-use tool definitions that plug directly into Claude's tool_use API
+- **Zero runtime dependencies** — Only uses Node.js built-ins (`fs`, `path`)
+- **Bring your own LLM** — Simple adapter interface works with any provider (Anthropic, OpenAI, etc.)
 
 ## Installation
 
@@ -10,10 +26,10 @@ Extracted from [monok.ai](https://monok.ai) — production-tested with real user
 npm install monok-memory
 ```
 
-Or install from GitHub:
+Or install directly from GitHub:
 
 ```bash
-npm install github:user/monok-memory
+npm install github:nuonical/monok-memory
 ```
 
 ## Quick Start
@@ -22,115 +38,219 @@ npm install github:user/monok-memory
 import { MemorySystem } from 'monok-memory';
 
 const memory = new MemorySystem({
-  basePath: './data/users',  // where user directories live
+  basePath: './data/users',
   defaultIdentity: { name: 'Alloy', personality: 'warm and thoughtful' },
 });
 
-// Write and read memory files
-memory.executeTool('write_file', { filename: 'notes.md', content: '# Notes' }, 'user123');
-memory.executeTool('read_file', { filename: 'notes.md' }, 'user123');
-
-// Get tool definitions for Claude tool_use
+// Get Claude tool definitions — plug these into your API call
 const tools = memory.getToolDefinitions();
 
-// Build system prompt with identity, session history, and insights
+// Execute tools when Claude calls them
+const result = memory.executeTool('write_file', {
+  filename: 'user_profile.md',
+  content: '# User Profile\n- Prefers dark mode\n- Works in TypeScript',
+}, 'user123');
+
+// Build a system prompt with identity + session history + insights
 const systemPrompt = memory.buildSystemPrompt('user123');
+```
+
+### Integrating with Claude
+
+Here's a minimal example of wiring `monok-memory` into a Claude API call:
+
+```typescript
+import Anthropic from '@anthropic-ai/sdk';
+import { MemorySystem } from 'monok-memory';
+
+const anthropic = new Anthropic();
+const memory = new MemorySystem({
+  basePath: './data/users',
+  defaultIdentity: { name: 'Alloy', personality: 'warm and thoughtful' },
+});
+
+async function chat(userId: string, userMessage: string) {
+  const systemPrompt = memory.buildSystemPrompt(userId);
+  const tools = memory.getToolDefinitions();
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250514',
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+    tools,
+  });
+
+  // Handle tool calls from Claude
+  for (const block of response.content) {
+    if (block.type === 'tool_use') {
+      const toolResult = memory.executeTool(block.name, block.input, userId);
+      // Send tool_result back to Claude in the next turn...
+    }
+  }
+
+  return response;
+}
+```
+
+## Memory Tools
+
+The package includes 13 tools in Claude `tool_use` format. Claude uses these autonomously to manage user memory:
+
+| Tool | Description |
+|------|-------------|
+| `read_file` | Read a file from the user's memory storage |
+| `write_file` | Save content to a memory file (supports subdirectories) |
+| `list_files` | List all files and folders in the user's storage |
+| `get_identity` | Get the bot's current identity/persona settings |
+| `update_identity` | Update the bot's name, personality, or voice |
+| `tag_memory` | Tag a conversation with topics and importance level |
+| `search_by_tag` | Find past memories by topic tag |
+| `update_user_insights` | Record learned patterns and preferences about the user |
+| `get_user_insights` | Retrieve all learned insights about the user |
+| `record_learning` | Record self-improvement insights about interactions |
+| `get_learnings` | Retrieve self-improvement learnings |
+| `track_pending_item` | Track an unresolved item for follow-up |
+| `resolve_pending_item` | Mark a pending item as resolved |
+
+### User Insights Categories
+
+When Claude calls `update_user_insights`, it categorizes observations about the user:
+
+- **preferences** — UI preferences, tool choices, workflow habits
+- **communication_style** — How the user likes to communicate
+- **work_patterns** — Scheduling, productivity patterns, work habits
+- **interests** — Topics and subjects the user engages with
+- **goals** — Short and long-term objectives the user has mentioned
+- **context** — Background info (role, team, projects)
+
+### Self-Improvement Categories
+
+The `record_learning` tool lets the bot improve over time:
+
+- **communication_style** — What response style works best
+- **topic_preference** — Topics the user engages with most
+- **response_length** — Preferred level of detail
+- **correction** — Things the user corrected
+- **success** — Approaches that worked well
+- **adaptation** — Adjustments made based on feedback
+
+## Configuration
+
+```typescript
+const memory = new MemorySystem({
+  // Required — base directory for all user data
+  basePath: './data/users',
+
+  // Optional — default bot identity (users can override per-user)
+  defaultIdentity: {
+    name: 'Alloy',
+    personality: 'warm and thoughtful',
+    voice: 'conversational and friendly',
+    description: 'An AI assistant with persistent memory',
+  },
+
+  // Optional — LLM provider for auto-generated summaries
+  llm: myLLMAdapter,
+
+  // Optional — context management tuning
+  context: {
+    summaryThreshold: 12,           // user exchanges before auto-summary triggers
+    maxMessagesBeforePrune: 30,     // start pruning after this many messages
+    messagesToKeep: 15,             // keep this many messages after pruning
+    recentMessagesToAlwaysKeep: 6,  // always keep the latest N for continuity
+  },
+
+  // Optional — session summary tuning
+  sessions: {
+    maxSummaries: 20,               // max stored session summaries per user
+    deduplicationThreshold: 0.7,    // similarity threshold for dedup (0-1)
+    consolidationThreshold: 0.6,    // similarity threshold for merging (0-1)
+  },
+
+  // Optional — custom logger (defaults to console)
+  logger: console,
+});
 ```
 
 ## API Reference
 
-### `new MemorySystem(config)`
-
-Create a new memory system instance.
-
-```typescript
-const memory = new MemorySystem({
-  basePath: './data/users',       // required — where user dirs live
-  defaultIdentity: {              // optional — defaults shown
-    name: 'Alloy',
-    personality: 'warm and thoughtful',
-  },
-  llm: myLLMAdapter,              // optional — for auto-generated summaries
-  context: {                      // optional — defaults shown
-    summaryThreshold: 12,         // user exchanges before auto-summary
-    maxMessagesBeforePrune: 30,   // start pruning after this many messages
-    messagesToKeep: 15,           // keep this many after pruning
-    recentMessagesToAlwaysKeep: 6 // always keep latest N for continuity
-  },
-  sessions: {                     // optional — defaults shown
-    maxSummaries: 20,             // max stored session summaries
-    deduplicationThreshold: 0.7,  // similarity threshold for dedup (0-1)
-    consolidationThreshold: 0.6,  // similarity threshold for consolidation
-  },
-  logger: console,                // optional — custom logger
-});
-```
-
 ### Tool Integration
 
 ```typescript
-// Get Claude tool_use definitions
+// Get all 13 memory tool definitions (Claude tool_use format)
 memory.getToolDefinitions(): ToolDefinition[]
 
-// Execute a memory tool
+// Execute a memory tool by name — returns null if tool name isn't recognized
 memory.executeTool(toolName: string, args: object, userId: string | number): ToolResult | null
 ```
-
-Available tools: `read_file`, `write_file`, `list_files`, `get_identity`, `update_identity`, `tag_memory`, `search_by_tag`, `update_user_insights`, `get_user_insights`, `record_learning`, `get_learnings`, `track_pending_item`, `resolve_pending_item`.
 
 ### Context Management
 
 ```typescript
-// Prune messages using importance scoring
-memory.pruneMessages(messages): { messages, pruned, prunedCount }
+// Prune messages using importance scoring (keeps system messages, recent messages,
+// and highest-scored older messages; adds a context bridge note)
+memory.pruneMessages(messages: Message[]): { messages: Message[], pruned: boolean, prunedCount?: number }
 
-// Check if auto-summary should trigger
-memory.shouldTriggerSummary(messages): boolean
+// Check if auto-summary should trigger based on message count
+memory.shouldTriggerSummary(messages: Message[]): boolean
 
-// Get auto-summary instruction prompt
-memory.getAutoSummaryPrompt(exchangeCount): string
+// Get the instruction prompt for auto-summarization
+memory.getAutoSummaryPrompt(exchangeCount: number): string
 
-// Get user insights formatted for system prompt
-memory.getUserInsightsContext(userId): string | null
+// Get formatted user insights for injection into system prompt
+memory.getUserInsightsContext(userId: string | number): string | null
 ```
 
 ### Sessions
 
 ```typescript
-// Get recent session summaries
-memory.getRecentSessionSummaries(userId, limit?): SessionSummary[]
+// Get recent session summaries (newest first)
+memory.getRecentSessionSummaries(userId: string | number, limit?: number): SessionSummary[]
 
-// Save a session summary (with deduplication)
-memory.saveSessionSummary(userId, summary, messageCount, conversationText)
+// Save a session summary — automatically deduplicates and consolidates similar entries
+memory.saveSessionSummary(userId, summary, messageCount, conversationText): { success?, skipped?, reason?, summary? }
 ```
 
 ### Identity
 
 ```typescript
-// Get user identity (merged with defaults)
-memory.getUserIdentity(userId): IdentityConfig
+// Get user identity (user-specific overrides merged with defaults)
+memory.getUserIdentity(userId: string | number): IdentityConfig
 
-// Save user identity
-memory.saveUserIdentity(userId, identity)
+// Save a per-user identity override
+memory.saveUserIdentity(userId: string | number, identity: IdentityConfig): void
 ```
 
-### History
+### History & Prompt
 
 ```typescript
-// Save messages to dated history file
-memory.saveToHistory(userId, messages)
+// Save messages to a dated history file (year/month/week structure)
+memory.saveToHistory(userId: string | number, messages: Message[]): void
+
+// Build a complete system prompt with identity, session history, and user insights
+memory.buildSystemPrompt(userId: string | number): string
 ```
 
-### System Prompt
+## Context Pruning
 
-```typescript
-// Build full system prompt with identity + session history + insights
-memory.buildSystemPrompt(userId, { isAdmin?: boolean }): string
-```
+When conversations get long, `pruneMessages()` intelligently removes less important messages while preserving context. Each message gets an importance score based on:
+
+| Signal | Score Boost |
+|--------|------------|
+| Personal information sharing | +5 |
+| Commitments or follow-up items | +4 |
+| Questions from the user | +3 |
+| Emotional expressions | +3 |
+| Code blocks | +2 |
+| Technical content | +2 |
+| Recency (newer messages) | +1 to +3 |
+
+System messages and the most recent messages are always preserved. A context bridge note is injected to maintain conversational continuity.
 
 ## LLM Provider
 
-The package ships with zero LLM dependencies. Provide your own adapter for features that need text generation:
+The package ships with zero LLM dependencies. Provide your own adapter for features like auto-generated summaries:
 
 ```typescript
 interface LLMProvider {
@@ -152,7 +272,7 @@ const anthropic = new Anthropic();
 const llm = {
   async generateText({ system, userMessage, maxTokens = 1024 }) {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250514',
       max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: userMessage }],
@@ -186,45 +306,65 @@ const llm = {
 
 ## Storage Format
 
-Each user gets a directory under `basePath`:
+Each user gets an isolated directory under `basePath`. Everything is plain JSON or text — no database required.
 
 ```
 basePath/
 └── {userId}/
-    ├── files/                    # User's memory files
-    │   ├── notes.md
-    │   ├── user_profile.md
-    │   ├── conversation_summaries.md
-    │   ├── memory_tags.json
-    │   ├── user_insights.json
-    │   ├── pending_items.json
+    ├── files/                        # User's memory files
+    │   ├── notes.md                  # Free-form notes
+    │   ├── user_profile.md           # Key facts about the user
+    │   ├── conversation_summaries.md # Dated conversation summaries
+    │   ├── memory_tags.json          # Tagged memory entries
+    │   ├── user_insights.json        # Learned user patterns
+    │   ├── pending_items.json        # Tracked follow-up items
     │   ├── self_improvement/
-    │   │   └── learnings.json
+    │   │   └── learnings.json        # Self-improvement data
     │   └── topics/
-    │       └── *.md
-    ├── identity.json             # Per-user identity override
-    ├── session_summaries.json    # Session history
-    └── history/                  # Dated conversation logs
-        └── {year}/{month}/week-{week}/
+    │       └── *.md                  # Topic-specific memory files
+    ├── identity.json                 # Per-user identity override
+    ├── session_summaries.json        # Session history with dedup
+    └── history/                      # Dated conversation logs
+        └── {year}/{month}/week-{N}/
             └── {YYYY-MM-DD}.txt
 ```
 
-All files are plain JSON or text. No database required.
-
 ## Advanced Usage
 
-Individual functions are exported for selective use:
+All internal functions are exported for selective use:
 
 ```typescript
 import {
+  // Context & pruning
   scoreMessageImportance,
   pruneMessages,
+
+  // Sessions
   extractTopics,
   isSummaryDuplicate,
+  getRecentSessionSummaries,
+  saveSessionSummary,
+
+  // Storage helpers
   getUserFilesDir,
+  readJsonFile,
+  writeJsonFile,
+
+  // Identity
+  getUserIdentity,
+  saveUserIdentity,
+
+  // Prompt building
   buildIdentityPrompt,
 } from 'monok-memory';
 ```
+
+## Security
+
+- **Path traversal protection** — All file operations sanitize paths to prevent directory escape
+- **Extension whitelist** — Only `.md`, `.txt`, and `.json` files can be created
+- **Per-user isolation** — Each user's data is stored in a separate directory
+- **No network calls** — The package never makes network requests; all storage is local
 
 ## License
 

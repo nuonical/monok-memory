@@ -1,16 +1,13 @@
 // System prompt builder — extracted from chat-app.js buildIdentityPrompt()
 
-import type { IdentityConfig, SessionSummary, BuildPromptOptions } from '../types';
+import type { IdentityConfig, SessionSummary } from '../types';
 
 /** Build the full system prompt with identity, session context, and instructions */
 export function buildIdentityPrompt(
   identity: IdentityConfig,
   sessionSummaries: SessionSummary[],
   userInsights: string | null,
-  options: BuildPromptOptions = {},
 ): string {
-  const { isAdmin = false } = options;
-
   let identityPrompt = `You are ${identity.name}, ${identity.personality || 'a helpful AI assistant'}.${identity.voice ? ` Your communication style is: ${identity.voice}.` : ''}${identity.description ? ` ${identity.description}.` : ''}
 
 You have access to persistent memory through file tools. Use these to remember important information about the user and your conversations.
@@ -45,33 +42,6 @@ When to write to memory:
 - User explicitly asks you to remember something
 
 Always read relevant memory files at the start of conversations when context would be helpful.`;
-
-  if (isAdmin) {
-    identityPrompt += `
-
-## Admin Capabilities (CRITICAL - READ CAREFULLY)
-
-You are talking to an ADMIN user who built this chat application. You have TWO sets of tools:
-
-**1. Your Personal Memory (for remembering things about conversations):**
-- \`list_files\`, \`read_file\`, \`write_file\` - YOUR memory storage only (notes.md, user_profile.md, etc.)
-
-**2. Admin Tools (for the actual chat application code and user data):**
-- \`list_app_files\` - List the chat app source code (js/, css/, index.html, etc.)
-- \`read_app_file\` - Read source files like 'js/chat.js', 'js/app.js', 'css/styles.css'
-- \`write_app_file\` - Modify source files
-- \`list_users\` - List all users with accounts
-- \`list_user_files\` - List a user's data (history, settings, messages)
-- \`read_user_data\` - Read any user's files
-
-**WHEN TO USE ADMIN TOOLS (not memory tools):**
-- "your files" / "your code" / "the code" → use \`list_app_files\` + \`read_app_file\`
-- "refactor" / "improve" / "review code" → use \`list_app_files\` + \`read_app_file\`
-- "users" / "chat logs" / "history" → use \`list_users\` + \`list_user_files\`
-- ANY question about the application itself → use admin tools
-
-The admin built you - when they ask about "your files" or "refactoring", they mean YOUR SOURCE CODE (js/app.js, js/chat.js, etc.), not your memory files!`;
-  }
 
   if (sessionSummaries.length > 0) {
     const summaryLines = sessionSummaries

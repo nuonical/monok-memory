@@ -225,7 +225,8 @@ export interface HistoryFile {
   name: string;
 }
 
-/** Options for building system prompt */
+/** Options for building system prompt (extend with app-specific fields) */
 export interface BuildPromptOptions {
-  isAdmin?: boolean;
+  /** Extra prompt text to append after the base identity prompt (before session/insights sections) */
+  extraPrompt?: string;
 }

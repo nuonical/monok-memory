@@ -106,9 +106,9 @@ describe('MemorySystem', () => {
     expect(prompt).toContain('helpful');
   });
 
-  it('buildSystemPrompt includes admin section when isAdmin', () => {
-    const prompt = memory.buildSystemPrompt('user1', { isAdmin: true });
-    expect(prompt).toContain('Admin Capabilities');
+  it('buildSystemPrompt includes memory tools section', () => {
+    const prompt = memory.buildSystemPrompt('user1');
+    expect(prompt).toContain('Memory Tools Available');
   });
 
   it('saveToHistory creates a history file', () => {
