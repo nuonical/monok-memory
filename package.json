@@ -1,0 +1,45 @@
+{
+  "name": "monok-memory",
+  "version": "0.1.0",
+  "description": "Persistent per-user memory system with file-based storage, tagging, insights, learnings, context management, and session summaries. Zero external dependencies.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "memory",
+    "ai",
+    "chatbot",
+    "persistent-memory",
+    "context-management",
+    "session-summary",
+    "file-storage",
+    "claude",
+    "llm"
+  ],
+  "author": "monok.ai",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
