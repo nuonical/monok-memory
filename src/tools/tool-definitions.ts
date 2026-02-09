@@ -36,6 +36,38 @@ export const MEMORY_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'append_file',
+    description: "Append content to an existing file in the user's memory storage. Creates the file if it doesn't exist. Useful for conversation summaries and logs.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: "The file path to append to (e.g., 'conversation_summaries.md')",
+        },
+        content: {
+          type: 'string',
+          description: 'The content to append',
+        },
+      },
+      required: ['filename', 'content'],
+    },
+  },
+  {
+    name: 'delete_file',
+    description: "Delete a file from the user's memory storage. Cannot delete directories.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: "The file path to delete (e.g., 'old-notes.md', 'topics/outdated.md')",
+        },
+      },
+      required: ['filename'],
+    },
+  },
+  {
     name: 'list_files',
     description: "List all files and folders in the user's memory storage, including subdirectories",
     input_schema: {

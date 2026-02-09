@@ -111,6 +111,19 @@ describe('MemorySystem', () => {
     expect(prompt).toContain('Memory Tools Available');
   });
 
+  it('buildSystemPrompt includes extraPrompt when provided', () => {
+    const prompt = memory.buildSystemPrompt('user1', {
+      extraPrompt: 'You also have admin privileges.',
+    });
+    expect(prompt).toContain('You also have admin privileges.');
+    expect(prompt).toContain('TestBot');
+  });
+
+  it('buildSystemPrompt works without extraPrompt', () => {
+    const prompt = memory.buildSystemPrompt('user1');
+    expect(prompt).not.toContain('admin');
+  });
+
   it('saveToHistory creates a history file', () => {
     const fs = require('fs');
     const path = require('path');

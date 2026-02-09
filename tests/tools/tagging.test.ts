@@ -53,6 +53,31 @@ describe('Tagging Tools', () => {
     expect(result?.all_tags).toContain('b');
   });
 
+  it('tag_memory rejects non-array tags', () => {
+    const result = memory.executeTool('tag_memory', {
+      tags: 'not-an-array',
+      summary: 'test',
+    }, 'u1');
+    expect(result?.error).toContain('non-empty array');
+  });
+
+  it('tag_memory rejects empty tags array', () => {
+    const result = memory.executeTool('tag_memory', {
+      tags: [],
+      summary: 'test',
+    }, 'u1');
+    expect(result?.error).toContain('non-empty array');
+  });
+
+  it('tag_memory rejects invalid importance', () => {
+    const result = memory.executeTool('tag_memory', {
+      tags: ['test'],
+      summary: 'test',
+      importance: 'super-important',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid importance');
+  });
+
   it('search_by_tag returns empty for no tags file', () => {
     const result = memory.executeTool('search_by_tag', { tag: 'anything' }, 'u1');
     expect(result?.results).toEqual([]);

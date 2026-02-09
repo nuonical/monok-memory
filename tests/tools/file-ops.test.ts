@@ -85,6 +85,56 @@ describe('File Operation Tools', () => {
     expect(names).toContain('sub/b.md');
   });
 
+  it('write_file rejects files without extensions', () => {
+    const result = memory.executeTool('write_file', { filename: 'memo', content: 'test' }, 'u1');
+    expect(result?.error).toContain('must have an extension');
+  });
+
+  it('append_file creates file if it does not exist', () => {
+    const result = memory.executeTool('append_file', { filename: 'log.md', content: 'line 1\n' }, 'u1');
+    expect(result?.success).toBe(true);
+
+    const read = memory.executeTool('read_file', { filename: 'log.md' }, 'u1');
+    expect(read?.content).toBe('line 1\n');
+  });
+
+  it('append_file appends to existing file', () => {
+    memory.executeTool('write_file', { filename: 'log.md', content: 'line 1\n' }, 'u1');
+    memory.executeTool('append_file', { filename: 'log.md', content: 'line 2\n' }, 'u1');
+
+    const read = memory.executeTool('read_file', { filename: 'log.md' }, 'u1');
+    expect(read?.content).toBe('line 1\nline 2\n');
+  });
+
+  it('append_file rejects bad extensions', () => {
+    const result = memory.executeTool('append_file', { filename: 'bad.exe', content: 'x' }, 'u1');
+    expect(result?.error).toContain('Invalid file extension');
+  });
+
+  it('append_file rejects files without extensions', () => {
+    const result = memory.executeTool('append_file', { filename: 'memo', content: 'x' }, 'u1');
+    expect(result?.error).toContain('must have an extension');
+  });
+
+  it('delete_file removes a file', () => {
+    memory.executeTool('write_file', { filename: 'temp.md', content: 'delete me' }, 'u1');
+    const result = memory.executeTool('delete_file', { filename: 'temp.md' }, 'u1');
+    expect(result?.success).toBe(true);
+
+    const read = memory.executeTool('read_file', { filename: 'temp.md' }, 'u1');
+    expect(read?.error).toContain('not found');
+  });
+
+  it('delete_file returns error for missing file', () => {
+    const result = memory.executeTool('delete_file', { filename: 'nope.md' }, 'u1');
+    expect(result?.error).toContain('not found');
+  });
+
+  it('delete_file blocks path traversal', () => {
+    const result = memory.executeTool('delete_file', { filename: '../../etc/passwd' }, 'u1');
+    expect(result?.error).toBeDefined();
+  });
+
   it('different users have isolated storage', () => {
     memory.executeTool('write_file', { filename: 'secret.md', content: 'user1 secret' }, 'u1');
     const result = memory.executeTool('read_file', { filename: 'secret.md' }, 'u2');

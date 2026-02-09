@@ -95,12 +95,14 @@ async function chat(userId: string, userMessage: string) {
 
 ## Memory Tools
 
-The package includes 13 tools in Claude `tool_use` format. Claude uses these autonomously to manage user memory:
+The package includes 15 tools in Claude `tool_use` format. Claude uses these autonomously to manage user memory:
 
 | Tool | Description |
 |------|-------------|
 | `read_file` | Read a file from the user's memory storage |
 | `write_file` | Save content to a memory file (supports subdirectories) |
+| `append_file` | Append content to an existing file (creates if missing) |
+| `delete_file` | Delete a file from the user's storage |
 | `list_files` | List all files and folders in the user's storage |
 | `get_identity` | Get the bot's current identity/persona settings |
 | `update_identity` | Update the bot's name, personality, or voice |
@@ -229,7 +231,10 @@ memory.saveUserIdentity(userId: string | number, identity: IdentityConfig): void
 memory.saveToHistory(userId: string | number, messages: Message[]): void
 
 // Build a complete system prompt with identity, session history, and user insights
-memory.buildSystemPrompt(userId: string | number): string
+memory.buildSystemPrompt(userId: string | number, options?: BuildPromptOptions): string
+
+// BuildPromptOptions lets you inject extra prompt text (e.g., admin instructions)
+// { extraPrompt?: string }
 ```
 
 ## Context Pruning

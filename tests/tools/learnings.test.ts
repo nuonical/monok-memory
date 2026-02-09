@@ -41,6 +41,23 @@ describe('Learnings Tools', () => {
     expect(success.length).toBe(1);
   });
 
+  it('record_learning rejects invalid category', () => {
+    const result = memory.executeTool('record_learning', {
+      category: 'invalid',
+      insight: 'test',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid category');
+  });
+
+  it('record_learning rejects invalid confidence', () => {
+    const result = memory.executeTool('record_learning', {
+      category: 'success',
+      insight: 'test',
+      confidence: 'very_confident',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid confidence');
+  });
+
   it('record_learning escalates confidence on duplicate', () => {
     memory.executeTool('record_learning', {
       category: 'communication_style',

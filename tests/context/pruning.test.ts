@@ -79,6 +79,29 @@ describe('pruneMessages', () => {
     expect(bridge).toBeDefined();
   });
 
+  it('context bridge includes topics from pruned messages', () => {
+    const messages: Message[] = [
+      // Early messages with detectable topics that will be pruned (low recency score)
+      { role: 'user', content: 'I have a bug in my code that is broken and needs a fix' },
+      { role: 'assistant', content: 'ok' },
+      { role: 'user', content: 'ok' },
+      { role: 'assistant', content: 'ok' },
+      // Fill with trivial messages to exceed threshold
+      ...Array.from({ length: 36 }, (_, i) => ({
+        role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `message ${i}`,
+      })),
+    ];
+    const result = pruneMessages(messages, DEFAULT_CONTEXT);
+    const bridge = result.messages.find(m =>
+      typeof m.content === 'string' && m.content.includes('[System:'),
+    );
+    expect(bridge).toBeDefined();
+    // The bug/debugging message should be detected in pruned content
+    const bridgeContent = bridge?.content as string;
+    expect(bridgeContent).toContain('Topics covered:');
+  });
+
   it('ensures last message is from user', () => {
     const messages: Message[] = Array.from({ length: 40 }, (_, i) => ({
       role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),

@@ -97,8 +97,11 @@ export function pruneMessages(messages: Message[], config: ResolvedContextConfig
   const prunedCount = olderMessages.length - keptOlderMessages.length;
 
   // Build context bridge with topics from pruned messages
+  const keptIndices = new Set(
+    sortedByScore.slice(0, Math.max(0, olderSlotsAvailable)).map(item => item.index),
+  );
   const prunedContent = scoredOlderMessages
-    .filter(m => !sortedByScore.slice(0, olderSlotsAvailable).includes(m))
+    .filter(m => !keptIndices.has(m.index))
     .map(m => (typeof m.message.content === 'string' ? m.message.content : ''))
     .join(' ');
 

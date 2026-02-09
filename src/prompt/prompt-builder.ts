@@ -1,12 +1,13 @@
 // System prompt builder — extracted from chat-app.js buildIdentityPrompt()
 
-import type { IdentityConfig, SessionSummary } from '../types';
+import type { IdentityConfig, SessionSummary, BuildPromptOptions } from '../types';
 
 /** Build the full system prompt with identity, session context, and instructions */
 export function buildIdentityPrompt(
   identity: IdentityConfig,
   sessionSummaries: SessionSummary[],
   userInsights: string | null,
+  options?: BuildPromptOptions,
 ): string {
   let identityPrompt = `You are ${identity.name}, ${identity.personality || 'a helpful AI assistant'}.${identity.voice ? ` Your communication style is: ${identity.voice}.` : ''}${identity.description ? ` ${identity.description}.` : ''}
 
@@ -42,6 +43,10 @@ When to write to memory:
 - User explicitly asks you to remember something
 
 Always read relevant memory files at the start of conversations when context would be helpful.`;
+
+  if (options?.extraPrompt) {
+    identityPrompt += `\n\n${options.extraPrompt}`;
+  }
 
   if (sessionSummaries.length > 0) {
     const summaryLines = sessionSummaries

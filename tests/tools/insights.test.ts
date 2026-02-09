@@ -42,6 +42,23 @@ describe('Insights Tools', () => {
     expect(prefs.length).toBe(1);
   });
 
+  it('update_user_insights rejects invalid category', () => {
+    const result = memory.executeTool('update_user_insights', {
+      category: 'invalid_category',
+      insight: 'test',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid category');
+  });
+
+  it('update_user_insights rejects invalid confidence', () => {
+    const result = memory.executeTool('update_user_insights', {
+      category: 'preferences',
+      insight: 'test',
+      confidence: 'very_confident',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid confidence');
+  });
+
   it('update_user_insights deduplicates similar insights', () => {
     memory.executeTool('update_user_insights', {
       category: 'preferences',

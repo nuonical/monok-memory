@@ -34,7 +34,7 @@ export function executeMemoryTool(
       const filePath = path.join(filesDir, safePath);
 
       if (!filePath.startsWith(filesDir)) {
-        return { error: 'Invalid file path' };
+        return { error: 'Invalid file path: path must stay within user directory' };
       }
 
       if (!fs.existsSync(filePath)) {
@@ -54,26 +54,83 @@ export function executeMemoryTool(
       const ext = path.extname(safePath).toLowerCase();
       const allowedExts = ['.md', '.txt', '.json'];
 
-      if (!allowedExts.includes(ext) && ext !== '') {
+      if (!ext) {
+        return { error: `File must have an extension. Allowed: ${allowedExts.join(', ')}` };
+      }
+
+      if (!allowedExts.includes(ext)) {
         return { error: `Invalid file extension. Allowed: ${allowedExts.join(', ')}` };
       }
 
       const filePath = path.join(filesDir, safePath || 'notes.md');
 
       if (!filePath.startsWith(filesDir)) {
-        return { error: 'Invalid file path' };
+        return { error: 'Invalid file path: path must stay within user directory' };
       }
 
       try {
         const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
+        fs.mkdirSync(dir, { recursive: true });
         const content = String(args.content);
         fs.writeFileSync(filePath, content, 'utf8');
         return { success: true, filename: safePath, size: Buffer.byteLength(content, 'utf8') };
       } catch (e: unknown) {
         return { error: `Failed to write file: ${(e as Error).message}` };
+      }
+    }
+
+    case 'append_file': {
+      const safePath = path.normalize(String(args.filename)).replace(/^(\.\.(\/|\\|$))+/, '');
+      const ext = path.extname(safePath).toLowerCase();
+      const allowedExts = ['.md', '.txt', '.json'];
+
+      if (!ext) {
+        return { error: `File must have an extension. Allowed: ${allowedExts.join(', ')}` };
+      }
+
+      if (!allowedExts.includes(ext)) {
+        return { error: `Invalid file extension. Allowed: ${allowedExts.join(', ')}` };
+      }
+
+      const filePath = path.join(filesDir, safePath || 'notes.md');
+
+      if (!filePath.startsWith(filesDir)) {
+        return { error: 'Invalid file path: path must stay within user directory' };
+      }
+
+      try {
+        const dir = path.dirname(filePath);
+        fs.mkdirSync(dir, { recursive: true });
+        const content = String(args.content);
+        fs.appendFileSync(filePath, content, 'utf8');
+        const stat = fs.statSync(filePath);
+        return { success: true, filename: safePath, size: stat.size };
+      } catch (e: unknown) {
+        return { error: `Failed to append to file: ${(e as Error).message}` };
+      }
+    }
+
+    case 'delete_file': {
+      const safePath = path.normalize(String(args.filename)).replace(/^(\.\.(\/|\\|$))+/, '');
+      const filePath = path.join(filesDir, safePath);
+
+      if (!filePath.startsWith(filesDir)) {
+        return { error: 'Invalid file path: path must stay within user directory' };
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return { error: `File '${safePath}' not found` };
+      }
+
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.isDirectory()) {
+          return { error: 'Cannot delete directories. Only files can be deleted.' };
+        }
+        fs.unlinkSync(filePath);
+        return { success: true, message: `Deleted '${safePath}'` };
+      } catch (e: unknown) {
+        return { error: `Failed to delete file: ${(e as Error).message}` };
       }
     }
 
@@ -130,16 +187,29 @@ export function executeMemoryTool(
 
     case 'tag_memory': {
       try {
+        if (!Array.isArray(args.tags) || args.tags.length === 0) {
+          return { error: 'tags must be a non-empty array of strings' };
+        }
+        const tags = (args.tags as unknown[]).map(t => String(t).trim()).filter(t => t.length > 0);
+        if (tags.length === 0) {
+          return { error: 'tags must contain at least one non-empty string' };
+        }
+
+        const validImportance = ['low', 'medium', 'high', 'critical'];
+        const importance = String(args.importance || 'medium');
+        if (!validImportance.includes(importance)) {
+          return { error: `Invalid importance. Allowed: ${validImportance.join(', ')}` };
+        }
+
         const tagsFile = path.join(filesDir, 'memory_tags.json');
         const tagsData = readJsonFile<TagsData>(tagsFile, { tags: {}, entries: [] });
 
-        const tags = args.tags as string[];
         const entry = {
           id: Date.now(),
           timestamp: new Date().toISOString(),
           tags,
           summary: String(args.summary),
-          importance: String(args.importance || 'medium'),
+          importance,
         };
 
         tagsData.entries.push(entry);
@@ -193,6 +263,17 @@ export function executeMemoryTool(
 
     case 'update_user_insights': {
       try {
+        const validCategories = ['preferences', 'communication_style', 'work_patterns', 'interests', 'goals', 'context'];
+        const category = String(args.category);
+        if (!validCategories.includes(category)) {
+          return { error: `Invalid category. Allowed: ${validCategories.join(', ')}` };
+        }
+
+        const validConfidence = ['observed_once', 'pattern_emerging', 'well_established'];
+        if (args.confidence && !validConfidence.includes(String(args.confidence))) {
+          return { error: `Invalid confidence. Allowed: ${validConfidence.join(', ')}` };
+        }
+
         const insightsFile = path.join(filesDir, 'user_insights.json');
         const insights = readJsonFile<InsightsData>(insightsFile, {
           preferences: [],
@@ -203,8 +284,6 @@ export function executeMemoryTool(
           context: [],
           last_updated: null,
         });
-
-        const category = String(args.category);
         if (!insights[category]) {
           (insights as Record<string, unknown>)[category] = [];
         }
@@ -282,10 +361,19 @@ export function executeMemoryTool(
 
     case 'record_learning': {
       try {
-        const learningsDir = path.join(filesDir, 'self_improvement');
-        if (!fs.existsSync(learningsDir)) {
-          fs.mkdirSync(learningsDir, { recursive: true });
+        const validCategories = ['communication_style', 'topic_preference', 'response_length', 'correction', 'success', 'adaptation'];
+        const category = String(args.category);
+        if (!validCategories.includes(category)) {
+          return { error: `Invalid category. Allowed: ${validCategories.join(', ')}` };
         }
+
+        const validConfidence = ['tentative', 'emerging', 'established'];
+        if (args.confidence && !validConfidence.includes(String(args.confidence))) {
+          return { error: `Invalid confidence. Allowed: ${validConfidence.join(', ')}` };
+        }
+
+        const learningsDir = path.join(filesDir, 'self_improvement');
+        fs.mkdirSync(learningsDir, { recursive: true });
 
         const learningsFile = path.join(learningsDir, 'learnings.json');
         const learnings = readJsonFile<LearningsData>(learningsFile, {
@@ -297,8 +385,6 @@ export function executeMemoryTool(
           adaptation: [],
           last_updated: null,
         });
-
-        const category = String(args.category);
         if (!learnings[category]) {
           (learnings as Record<string, unknown>)[category] = [];
         }
@@ -379,6 +465,12 @@ export function executeMemoryTool(
 
     case 'track_pending_item': {
       try {
+        const validPriority = ['low', 'medium', 'high'];
+        const priority = String(args.priority || 'medium');
+        if (!validPriority.includes(priority)) {
+          return { error: `Invalid priority. Allowed: ${validPriority.join(', ')}` };
+        }
+
         const pendingFile = path.join(filesDir, 'pending_items.json');
         const data = readJsonFile<PendingItemsData>(pendingFile, { items: [], last_updated: null });
 
@@ -386,7 +478,7 @@ export function executeMemoryTool(
           id: Date.now(),
           item: String(args.item),
           context: args.context ? String(args.context) : null,
-          priority: String(args.priority || 'medium'),
+          priority,
           created: new Date().toISOString(),
           resolved: false,
         };

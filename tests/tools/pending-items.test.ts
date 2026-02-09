@@ -43,6 +43,14 @@ describe('Pending Items Tools', () => {
     expect(result?.error).toContain('not found');
   });
 
+  it('track_pending_item rejects invalid priority', () => {
+    const result = memory.executeTool('track_pending_item', {
+      item: 'Test',
+      priority: 'urgent',
+    }, 'u1');
+    expect(result?.error).toContain('Invalid priority');
+  });
+
   it('resolve_pending_item errors when no file', () => {
     const result = memory.executeTool('resolve_pending_item', { item_id: 1 }, 'u1');
     expect(result?.error).toContain('No pending items found');
